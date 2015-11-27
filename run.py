@@ -41,9 +41,11 @@ m = None
 collision_queue = Queue.Queue()
 
 class VirtualWorldGui:
-    def __init__(self, vWorld, joystick, m):
+    def __init__(self, vWorld, m, rCanvas):
         self.vworld = vWorld
-        self.joystick = joystick
+        self.m = m
+        self.rCanvas = rCanvas
+        self.joysticks = []
         self.gRobotList = None
         self.existingThreads = []
         self._period = 0.05
@@ -104,11 +106,19 @@ class VirtualWorldGui:
         self.button11.pack(side='left')
         self.button11.bind('<Button-1>', stopProg)
 
-    # reset to the starting position for 3-2
+    # reset to the starting position for the beginning of tag
     def resetvRobot(self, event=None):
-        self.vworld.vrobot.x = 0
-        self.vworld.vrobot.y = 20
-        self.vworld.vrobot.a = 0
+        coords = [(-100,-100), (-100,100), (100,100), (100,-100)]
+        angles = [0, 90, 180, 270]
+        self.joysticks = []
+        for i, robot in enumerate(comm.robotList):
+            joystick = self.create_joystick(robot)
+            self.vworld.add_vrobot(joystick.vrobot)
+            x, y = coords[i]
+            joystick.vrobot.x = x
+            joystick.vrobot.y = y
+            joystick.vrobot.a = angles[i]
+            self.joysticks.append(joystick)
 
     def toggleTrace(self, event=None):
         if self.vworld.trace:
@@ -156,14 +166,14 @@ class VirtualWorldGui:
 
     def clearCanvas(self, event=None):
         vcanvas = self.vworld.canvas
-        vrobot = self.vworld.vrobot
-        vcanvas.delete("all")
-        poly_points = [0,0,0,0,0,0,0,0]
-        vrobot.poly_id = vcanvas.create_polygon(poly_points, fill='blue')
-        vrobot.prox_l_id = vcanvas.create_line(0,0,0,0, fill="red")
-        vrobot.prox_r_id = vcanvas.create_line(0,0,0,0, fill="red")
-        vrobot.floor_l_id = vcanvas.create_oval(0,0,0,0, outline="white", fill="white")
-        vrobot.floor_r_id = vcanvas.create_oval(0,0,0,0, outline="white", fill="white")
+        for vrobot in self.vworld.vrobots:
+            vcanvas.delete("all")
+            poly_points = [0,0,0,0,0,0,0,0]
+            vrobot.poly_id = vcanvas.create_polygon(poly_points, fill='blue')
+            vrobot.prox_l_id = vcanvas.create_line(0,0,0,0, fill="red")
+            vrobot.prox_r_id = vcanvas.create_line(0,0,0,0, fill="red")
+            vrobot.floor_l_id = vcanvas.create_oval(0,0,0,0, outline="white", fill="white")
+            vrobot.floor_r_id = vcanvas.create_oval(0,0,0,0, outline="white", fill="white")
 
     def updateCanvas(self, drawQueue):
         self.vworld.canvas.after(UPDATE_INTERVAL, self.updateCanvas, drawQueue)
@@ -179,10 +189,10 @@ class VirtualWorldGui:
         for i, robot in enumerate(comm.robotList):
             fsm = None
             if i == 0:
-                fsm = StateMachine(robot, True)
+                fsm = StateMachine(robot, self.joysticks[i], True)
                 fsm.queue.put(("got tagged", "Walk"))
             else:
-                fsm = StateMachine(robot, False)
+                fsm = StateMachine(robot, self.joysticks[i], False)
                 fsm.queue.put(("tagged", "Walk"))
             self.fsms.append(fsm)
             fsm_thread = threading.Thread(target=fsm.run)
@@ -192,6 +202,26 @@ class VirtualWorldGui:
             thread = threading.Thread(target=collectData, args=(fsm.queue, robot))
             thread.daemon = True
             thread.start()
+
+    def create_joystick(self, robot):
+        rCanvas = self.rCanvas
+        joystick = Joystick(comm, self.m, rCanvas, robot)
+
+        # visual elements of the virtual robot
+        poly_points = [0,0,0,0,0,0,0,0]
+        joystick.vrobot.poly_id = rCanvas.create_polygon(poly_points, fill='blue') #robot
+        joystick.vrobot.prox_l_id = rCanvas.create_line(0,0,0,0, fill="red") #prox sensors
+        joystick.vrobot.prox_r_id = rCanvas.create_line(0,0,0,0, fill="red")
+        joystick.vrobot.floor_l_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white") #floor sensors
+        joystick.vrobot.floor_r_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white")
+
+        time.sleep(1)
+
+        update_vrobot_thread = threading.Thread(target=joystick.update_virtual_robot)
+        update_vrobot_thread.daemon = True
+        update_vrobot_thread.start()
+
+        return joystick
 
     def localize(self):
         xs = []
@@ -208,23 +238,9 @@ class VirtualWorldGui:
         angle = math.atan(m)
         # self.localize_helper(angle, perp_dist)
 
-    # aligns robot to face an obstacle head on
-    def align_robot(self):
-        vrobot = self.vworld.vrobot
-        if (vrobot.dist_r > vrobot.dist_l):
-            self.joystick.move_left()
-            while(vrobot.dist_r > vrobot.dist_l):
-                time.sleep(0.05)
-        else:
-            self.joystick.move_right()
-            while(vrobot.dist_l > vrobot.dist_r):
-                time.sleep(0.05)
-        self.joystick.stop_move()
-
     def collide(self, event=None):
         if self.existingThreads:
             pass
-            # self.joysticks.move_forward()
         else:
             for i in range(len(comm.robotList)):
                 sensor_thread = threading.Thread(target=self.senseCollision, args=(i,))
@@ -240,7 +256,6 @@ class VirtualWorldGui:
     def detectCollision(self):
         time.sleep(0.5)
 
-        # self.joystick.move_forward()
         while not gQuit:
             while(collision_queue.empty()):
                 time.sleep(0.1)
@@ -256,7 +271,7 @@ class VirtualWorldGui:
                         not_it_index = collide_index_2 if self.fsms[collide_index_1].are_it else collide_index_1
                         self.fsms[it_index].queue.put(("tagged", "Walk"))
                         self.fsms[not_it_index].queue.put(("got tagged", "Walk"))
-                        self.joystick.play_sound(it_index)
+                        self.joysticks[it_index].play_sound()
                         collision_queue.queue.clear()
                         break
 
@@ -283,7 +298,7 @@ class VirtualWorldGui:
         smoothingFactor = 0.8
         collisionThreshold = 700
         while not gQuit:
-            x, y, z = self.joystick.read_accelerometer_data(i)
+            x, y, z = self.joysticks[i].read_accelerometer_data()
             # if lastY != None and lastX != None:
             #     filteredY = (1-smoothingFactor)*lastY + smoothingFactor*(y)
             #     filteredX = (1-smoothingFactor)*lastX + smoothingFactor*(x)
@@ -351,10 +366,12 @@ def calculate_least_sqs(xvalues, yvalues):
     return (m, b)
 
 class Joystick:
-    def __init__(self, comm, m, rCanvas):
+    def __init__(self, comm, m, rCanvas, robot):
         self.gMaxRobotNum = 1
         self.gRobotList = comm.robotList
         self.m = m
+        self.robot = robot
+        self.speed = 30
         self.vrobot = virtual_robot()
         self.vrobot.t = time.time()
 
@@ -369,45 +386,37 @@ class Joystick:
     # joysticking the robot
     def move_up(self, event=None):
         if self.gRobotList:
-            robot = self.gRobotList[0]
-            self.vrobot.sl = 30
-            self.vrobot.sr = 30
+            robot = self.robot
+            print "moving up with robot = ", robot
+            self.vrobot.sl = self.speed
+            self.vrobot.sr = self.speed
             robot.set_wheel(0,self.vrobot.sl)
             robot.set_wheel(1,self.vrobot.sr)
             self.vrobot.t = time.time()
 
-    def move_forward(self):
-        if self.gRobotList:
-            for robot in self.gRobotList:
-                self.vrobot.sl = 50
-                self.vrobot.sr = 50
-                robot.set_wheel(0,self.vrobot.sl)
-                robot.set_wheel(1,self.vrobot.sr)
-                self.vrobot.t = time.time()
-
     def move_down(self, event=None):
         if self.gRobotList:
-            robot = self.gRobotList[0]
-            self.vrobot.sl = -30
-            self.vrobot.sr = -30
+            robot = self.robot
+            self.vrobot.sl = -1*self.speed
+            self.vrobot.sr = -1*self.speed
             robot.set_wheel(0,self.vrobot.sl)
             robot.set_wheel(1,self.vrobot.sr)
             self.vrobot.t = time.time()
 
     def move_left(self, event=None):
         if self.gRobotList:
-            robot = self.gRobotList[0]
-            self.vrobot.sl = -15
-            self.vrobot.sr = 15
+            robot = self.robot
+            self.vrobot.sl = -1*self.speed/2
+            self.vrobot.sr = self.speed/2
             robot.set_wheel(0,self.vrobot.sl)
             robot.set_wheel(1,self.vrobot.sr)
             self.vrobot.t = time.time()
 
     def move_right(self, event=None):
         if self.gRobotList:
-            robot = self.gRobotList[0]
-            self.vrobot.sl = 15
-            self.vrobot.sr = -15
+            robot = self.robot
+            self.vrobot.sl = self.speed/2
+            self.vrobot.sr = -1*self.speed/2
             robot.set_wheel(0,self.vrobot.sl)
             robot.set_wheel(1,self.vrobot.sr)
             self.vrobot.t = time.time()
@@ -427,13 +436,13 @@ class Joystick:
 
     def read_psd_distance(self, event=None):
         if self.gRobotList:
-            robot = self.gRobotList[0]
+            robot = self.robot
             print robot.get_port(0)
             return robot.get_port(0)
 
-    def read_accelerometer_data(self, i):
+    def read_accelerometer_data(self):
         if self.gRobotList:
-            robot = self.gRobotList[i]
+            robot = self.robot
             x = robot.get_acceleration(0)
             y = robot.get_acceleration(1)
             z = robot.get_acceleration(2)
@@ -442,7 +451,7 @@ class Joystick:
 
     def look(self, angle):
         if self.gRobotList:
-            robot = self.gRobotList[0]
+            robot = self.robot
             self.write_servo_position(robot, angle)
 
     def turn_clockwise(self, angle):
@@ -459,8 +468,8 @@ class Joystick:
                 time.sleep(0.1)
             self.stop_move()
 
-    def play_sound(self, i):
-        robot = self.gRobotList[i]
+    def play_sound(self):
+        robot = self.robot
         robot.set_musical_note(40)
         time.sleep(0.2)
         robot.set_musical_note(0)
@@ -490,7 +499,7 @@ class Joystick:
 
         while not gQuit:
             if self.gRobotList is not None:
-                robot = self.gRobotList[0]
+                robot = self.robot
 
                 t = time.time()
                 del_t = t - self.vrobot.t
@@ -531,11 +540,11 @@ def stopProg(event=None):
     gQuit = True
     print "Exit"
 
-def draw_virtual_world(virtual_world, joystick):
+def draw_virtual_world(virtual_world):
     time.sleep(1) # give time for robot to connect.
     while not gQuit:
-        if joystick.gRobotList is not None:
-            virtual_world.draw_robot()
+        if comm.robotList is not None:
+            virtual_world.draw_robots()
             virtual_world.draw_prox("left")
             virtual_world.draw_prox("right")
             virtual_world.draw_floor("left")
@@ -556,36 +565,22 @@ def main(argv=None):
     canvas_height = 380 # half height
     rCanvas = tk.Canvas(m, bg="white", width=canvas_width*2, height=canvas_height*2)
 
-    joystick = Joystick(comm, m, rCanvas)
-
-    # visual elements of the virtual robot
-    poly_points = [0,0,0,0,0,0,0,0]
-    joystick.vrobot.poly_id = rCanvas.create_polygon(poly_points, fill='blue') #robot
-    joystick.vrobot.prox_l_id = rCanvas.create_line(0,0,0,0, fill="red") #prox sensors
-    joystick.vrobot.prox_r_id = rCanvas.create_line(0,0,0,0, fill="red")
-    joystick.vrobot.floor_l_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white") #floor sensors
-    joystick.vrobot.floor_r_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white")
-
-    time.sleep(1)
-
-    update_vrobot_thread = threading.Thread(target=joystick.update_virtual_robot)
-    update_vrobot_thread.daemon = True
-    update_vrobot_thread.start()
+    joystick = Joystick(comm, m, rCanvas, None)
 
     #create the virtual worlds that contains the virtual robot
-    vWorld = virtual_world(drawQueue, joystick.vrobot, rCanvas, canvas_width, canvas_height)
+    vWorld = virtual_world(drawQueue, rCanvas, canvas_width, canvas_height)
 
-    draw_world_thread = threading.Thread(target=draw_virtual_world, args=(vWorld, joystick))
+    draw_world_thread = threading.Thread(target=draw_virtual_world, args=(vWorld,))
     draw_world_thread.daemon = True
     draw_world_thread.start()
 
-    gui = VirtualWorldGui(vWorld, joystick, m)
+    gui = VirtualWorldGui(vWorld, m, rCanvas)
 
     rCanvas.after(200, gui.updateCanvas, drawQueue)
     m.mainloop()
 
 
-    for robot in joystick.gRobotList:
+    for robot in comm.robotList:
         robot.reset()
     comm.stop()
     comm.join()

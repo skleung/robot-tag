@@ -12,10 +12,11 @@ class State:
 
 
 class StateMachine:
-  def __init__(self, robot, are_it=False):
+  def __init__(self, robot, joystick, are_it=False):
     self.states = {}
     self.currentState = None
     self.robot = robot
+    self.joystick = joystick
     self.speed = 30
     self.are_it = are_it
     if self.are_it:
@@ -115,26 +116,28 @@ class StateMachine:
     self.move_up()
 
   def move_up(self):
-    self.robot.set_wheel(0,self.speed)
-    self.robot.set_wheel(1,self.speed)
+    self.joystick.speed = self.speed
+    self.joystick.move_up()
 
   def move_down(self):
-    self.robot.set_wheel(0,-self.speed)
-    self.robot.set_wheel(1,-self.speed)
+    self.joystick.speed = self.speed
+    self.joystick.move_down()
 
   def move_left(self):
-    self.robot.set_wheel(0,self.speed)
-    self.robot.set_wheel(1,-self.speed)
+    self.joystick.speed = self.speed
+    self.joystick.move_left()
 
   def move_right(self):
-    self.robot.set_wheel(0,-self.speed)
-    self.robot.set_wheel(1,self.speed)
+    self.joystick.speed = self.speed
+    self.joystick.move_right()
 
   def run(self):
     self.move_up()
     while(True):
       state = self.states[self.currentState]
-
+      if self.queue.empty():
+        time.sleep(0.1)
+        continue
       transition, next_state = self.queue.get()
       if transition in state.transitions and next_state in self.states:
         state.transitions[transition]()
