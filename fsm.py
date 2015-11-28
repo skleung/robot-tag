@@ -7,55 +7,71 @@ class State:
     self.transitions = {}
 
   # Takes a transition name and assigns it to a callback
-  def add_transition(self, transition, callback):
-    self.transitions[transition] = callback
+  # transition: event name, callback: action/behavior, toState: final state after action/behavior 
+  def add_transition(self, transition, callback, toState):
+    self.transitions[transition] = (callback, toState)
 
 
 class StateMachine:
-  def __init__(self, robot, joystick, are_it=False):
+  def __init__(self, robot, joystick):
     self.states = {}
     self.currentState = None
     self.robot = robot
     self.joystick = joystick
     self.speed = 30
-    self.are_it = are_it
-    if self.are_it:
-      self.speed = 60
     self.queue = Queue.Queue()
     # self.collisionQueue = Queue.Queue()
 
+    # add floor stuff later
+
+    # NOT IT 
+    # walk
     walk_state = self.add_state("Walk")
+    walk_state.add_transition("got tagged", self.turnOn, "It Walk") # ?
+    walk_state.add_transition("tagged", self.turnOn, "Walk") # ?
+    walk_state.add_transition("obj right", self.move_left, "Walk Left")
+    walk_state.add_transition("obj left", self.move_right, "Walk Right")
+    walk_state.add_transition("obj ahead", self.move_right, "Walk Right")
+    walk_state.add_transition("clear", self.move_up, "Walk")
+    # walk left
+    walk_left_state = self.add_state("Walk Left")
+    walk_left_state.add_transition("obj right", self.move_left, "Walk Left")
+    walk_left_state.add_transition("obj left", self.move_right, "Walk Right")
+    walk_left_state.add_transition("obj ahead", self.move_left, "Walk Left")
+    walk_left_state.add_transition("clear", self.move_up, "Walk")
+    # walk right
+    walk_right_state = self.add_state("Walk Right")
+    walk_right_state.add_transition("obj right", self.move_left, "Walk Left")
+    walk_right_state.add_transition("obj left", self.move_right, "Walk Right")
+    walk_right_state.add_transition("obj ahead", self.move_left, "Walk Right")
+    walk_right_state.add_transition("clear", self.move_up, "Walk")
+
+    # IT
+    # walk
+    it_walk_state = self.add_state("It Walk")
     self.set_start("Walk")
-    walk_state.add_transition("line left", self.turn_left)
-    walk_state.add_transition("line both", self.move_up)
-    walk_state.add_transition("line right", self.turn_right)
-    walk_state.add_transition("robot left", self.respondLeft)
-    walk_state.add_transition("robot right", self.respondRight)
-    walk_state.add_transition("tagged", self.turnOff)
-    walk_state.add_transition("got tagged", self.turnOn)
-    # walk_state.add_transition("robot ahead", self.respondAhead)
+    it_walk_state.add_transition("tagged", self.turnOff, "Walk") # ?
+    it_walk_state.add_transition("got tagged", self.turnOff, "It Walk") # ?
+    it_walk_state.add_transition("obj right", self.move_right, "It Walk Right")
+    it_walk_state.add_transition("obj left", self.move_left, "It Walk Left")
+    it_walk_state.add_transition("obj ahead", self.move_up, "It Walk") # could add ram state
+    it_walk_state.add_transition("clear", self.move_up, "It Walk")
+    # walk left    
+    it_walk_left_state = self.add_state("It Walk Left")
+    it_walk_left_state.add_transition("obj right", self.move_right, "It Walk Right")
+    it_walk_left_state.add_transition("obj left", self.move_left, "It Walk Left")
+    it_walk_left_state.add_transition("obj ahead", self.move_up, "It Walk")
+    it_walk_left_state.add_transition("clear", self.move_up, "It Walk")
+    # walk right
+    it_walk_right_state = self.add_state("It Walk Right")
+    it_walk_right_state.add_transition("obj right", self.move_right, "It Walk Right")
+    it_walk_right_state.add_transition("obj left", self.move_left, "It Walk Left")
+    it_walk_right_state.add_transition("obj ahead", self.move_up, "It Walk")
+    it_walk_right_state.add_transition("clear", self.move_up, "It Walk")
 
-  def set_light(self, on):
-    if on:
-      self.robot.set_led(0,4)
-      self.robot.set_led(1,4)
-    else:
-      self.robot.set_led(0,1)
-      self.robot.set_led(1,1)
-
-  def turnOff(self):
-    print "turning off"
-    self.set_light(False)
-    self.speed = 30
-    self.move_up()
-    self.are_it = False
-
-  def turnOn(self):
-    print "turning on"
-    self.set_light(True)
-    self.speed = 60
-    self.move_up()
-    self.are_it = True
+# TODO: remove all sleeps in callback movements
+# clarify what package is being put on the event queue
+# should pass in the name of the transition then check if that transition is in the current state...
 
   def add_state(self, name):
     a_state = State()
@@ -66,53 +82,27 @@ class StateMachine:
   def set_start(self, name):
     self.currentState = name
 
-  def clearQueue(self):
-    collision_event = None
-    while(not self.queue.empty()):
-      temp = self.queue.get()
-      if (temp[0] == "tagged" or temp[0] == "got tagged"):
-        collision_event = temp
-    self.queue.queue.clear()
-    self.queue.put(collision_event)
-
-  def clearCollisionQueue(self):
-    self.collisionQueue.queue.clear()
-
-  def respondAhead(self):
-    if not self.are_it:
-      self.move_down()
-
-  def respondRight(self):
-    if self.are_it:
-      self.turn_right()
+  # behaviors
+  def set_light(self, on):
+    if on:
+      self.robot.set_led(0,4)
+      self.robot.set_led(1,4)
     else:
-      self.turn_left()
+      self.robot.set_led(0,1)
+      self.robot.set_led(1,1)
 
-  def respondLeft(self):
-    if not self.are_it:
-      self.turn_right()
-    else:
-      self.turn_left()
-
-  # TODO: Refactor turning to use states to enter and break out
-  def turn_right(self):
-    self.move_right()
-    time.sleep(0.05)
-    self.clearQueue()
+  # set not it state
+  def turnOff(self):
+    print "turning off"
+    self.set_light(False)
+    self.speed = 30
     self.move_up()
 
-  def turn_left(self):
-    self.move_left()
-    time.sleep(0.05)
-    self.clearQueue()
-    self.move_up()
-
-  def back_up(self):
-    self.move_down()
-    time.sleep(1)
-    self.move_right()
-    time.sleep(0.5)
-    self.clearQueue()
+  # set it state
+  def turnOn(self):
+    print "turning on"
+    self.set_light(True)
+    self.speed = 60
     self.move_up()
 
   def move_up(self):
@@ -138,8 +128,11 @@ class StateMachine:
       if self.queue.empty():
         time.sleep(0.1)
         continue
-      transition, next_state = self.queue.get()
-      if transition in state.transitions and next_state in self.states:
-        state.transitions[transition]()
-        self.currentState = next_state
+      transitionName = self.queue.get()
+      if transitionName in state.transitions:
+        print self.currentState, "-->", state.transitions[transitionName][1]
+        state.transitions[transitionName][0]()
+        self.currentState = state.transitions[transitionName][1]
         time.sleep(0.1)
+      else:
+        print "didn't register:", transitionName

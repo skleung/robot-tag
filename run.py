@@ -189,11 +189,12 @@ class VirtualWorldGui:
         for i, robot in enumerate(comm.robotList):
             fsm = None
             if i == 0:
-                fsm = StateMachine(robot, self.joysticks[i], True)
-                fsm.queue.put(("got tagged", "Walk"))
+                fsm = StateMachine(robot, self.joysticks[i])
+                fsm.queue.put("got tagged") # it 
+                # fsm.queue.put("tagged") # not it
             else:
-                fsm = StateMachine(robot, self.joysticks[i], False)
-                fsm.queue.put(("tagged", "Walk"))
+                fsm = StateMachine(robot, self.joysticks[i])
+                fsm.queue.put("tagged") # not it
             self.fsms.append(fsm)
             fsm_thread = threading.Thread(target=fsm.run)
             fsm_thread.daemon = True
@@ -335,28 +336,39 @@ def collectData(queue, robot):
         # sense floor
         floor_left = robot.get_floor(0)
         floor_right = robot.get_floor(1)
-
-        if (floor_left < 25 and floor_right > 25):
-            queue.put(("line left", "Walk"))
-        if (floor_left > 25 and floor_right < 25):
-            queue.put(("line right", "Walk"))
-        if (floor_left < 25 and floor_right < 25):
-            queue.put(("line both", "Walk"))
-        if (floor_left < 25 or floor_right < 25):
-            queue.put(("line detected", "Walk"))
-
-        # sense proximity
         proximity_left = robot.get_proximity(0)
         proximity_right = robot.get_proximity(1)
-        print proximity_left, proximity_right
-        if (proximity_left > PROXIMITY_THRESHOLD or proximity_right > PROXIMITY_THRESHOLD):
+
+        if (proximity_left > PROXIMITY_THRESHOLD or proximity_right > PROXIMITY_THRESHOLD): # obj detected
             if (proximity_left > proximity_right and (proximity_left - proximity_right) > PROXIMITY_ERROR):
-                queue.put(("robot right", "Walk"))
+                queue.put("obj left")
             elif (proximity_left < proximity_right and (proximity_right - proximity_left) > PROXIMITY_ERROR):
-                queue.put(("robot left", "Walk"))
-            else: # go straight
-                queue.put(("robot ahead", "Walk"))
-        time.sleep(0.05)
+                queue.put("obj right")
+            else:
+                queue.put("obj ahead")
+        else:
+            queue.put("clear")
+
+        # if (floor_left < 25 and floor_right > 25):
+        #     queue.put(("line left", "Walk"))
+        # if (floor_left > 25 and floor_right < 25):
+        #     queue.put(("line right", "Walk"))
+        # if (floor_left < 25 and floor_right < 25):
+        #     queue.put(("line both", "Walk"))
+        # if (floor_left < 25 or floor_right < 25):
+        #     queue.put(("line detected", "Walk"))
+
+        # # sense proximity
+        
+        # print proximity_left, proximity_right
+        # if (proximity_left > PROXIMITY_THRESHOLD or proximity_right > PROXIMITY_THRESHOLD):
+        #     if (proximity_left > proximity_right and (proximity_left - proximity_right) > PROXIMITY_ERROR):
+        #         queue.put(("robot right", "Walk"))
+        #     elif (proximity_left < proximity_right and (proximity_right - proximity_left) > PROXIMITY_ERROR):
+        #         queue.put(("robot left", "Walk"))
+        #     else: # go straight
+        #         queue.put(("robot ahead", "Walk"))
+        time.sleep(0.1)
 
 def calculate_least_sqs(xvalues, yvalues):
     x = np.array(xvalues)
