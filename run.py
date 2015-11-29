@@ -191,7 +191,6 @@ class VirtualWorldGui:
             if i == 0:
                 fsm = StateMachine(robot, self.joysticks[i])
                 fsm.queue.put("got tagged") # it 
-                # fsm.queue.put("tagged") # not it
             else:
                 fsm = StateMachine(robot, self.joysticks[i])
                 fsm.queue.put("tagged") # not it
@@ -216,7 +215,7 @@ class VirtualWorldGui:
         joystick.vrobot.floor_l_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white") #floor sensors
         joystick.vrobot.floor_r_id = rCanvas.create_oval(0,0,0,0, outline="white", fill="white")
 
-        time.sleep(1)
+        time.sleep(0.5)
 
         update_vrobot_thread = threading.Thread(target=joystick.update_virtual_robot)
         update_vrobot_thread.daemon = True
@@ -254,14 +253,31 @@ class VirtualWorldGui:
             detect_thread.start()
             self.existingThreads.append(detect_thread)
 
+    def maintainItState(self):
+        n_its = 0
+        for fsm in self.fsms:
+            if fsm.currentState[0:2] == "It":
+                n_its += 1
+        if n_its > 1:
+            print "too many its"
+            for fsm in self.fsms:
+                fsm.queue.put("tagged")
+        if n_its < 1:
+            print "too few its"
+            self.fsms[2].queue.put("got tagged")
+
+
+
     def detectCollision(self):
         time.sleep(0.5)
 
         while not gQuit:
             while(collision_queue.empty()):
                 time.sleep(0.1)
+                self.maintainItState()
 
             collide_index_1, ts1 =  collision_queue.get()
+            self.maintainItState()    
             while(not collision_queue.empty()):
                 # two independent collisions are detected
                 collide_index_2, ts2 = collision_queue.get()
@@ -271,7 +287,10 @@ class VirtualWorldGui:
                         not_it_index = collide_index_2 if self.fsms[collide_index_1].currentState[0:2] == "It" else collide_index_1
                         self.fsms[it_index].queue.put("tagged")
                         self.fsms[not_it_index].queue.put("got tagged")
-                        print "tag detected"
+                        print "tag detected", "it:", it_index, "not it:", not_it_index
+                        print "successfull tag:", self.fsms[it_index].currentState[0:2] == "It"
+                self.maintainItState()
+
 
     def lowpass(self, alpha, old, new):
         return alpha * new + (1.0 - alpha) * old
@@ -354,26 +373,6 @@ def collectData(queue, robot):
         else:
             queue.put("floor clear")
 
-
-        # if (floor_left < 25 and floor_right > 25):
-        #     queue.put(("line left", "Walk"))
-        # if (floor_left > 25 and floor_right < 25):
-        #     queue.put(("line right", "Walk"))
-        # if (floor_left < 25 and floor_right < 25):
-        #     queue.put(("line both", "Walk"))
-        # if (floor_left < 25 or floor_right < 25):
-        #     queue.put(("line detected", "Walk"))
-
-        # # sense proximity
-        
-        # print proximity_left, proximity_right
-        # if (proximity_left > PROXIMITY_THRESHOLD or proximity_right > PROXIMITY_THRESHOLD):
-        #     if (proximity_left > proximity_right and (proximity_left - proximity_right) > PROXIMITY_ERROR):
-        #         queue.put(("robot right", "Walk"))
-        #     elif (proximity_left < proximity_right and (proximity_right - proximity_left) > PROXIMITY_ERROR):
-        #         queue.put(("robot left", "Walk"))
-        #     else: # go straight
-        #         queue.put(("robot ahead", "Walk"))
         time.sleep(0.05)
 
 def calculate_least_sqs(xvalues, yvalues):
@@ -441,12 +440,12 @@ class Joystick:
 
     def stop_move(self, event=None):
         if self.gRobotList:
-            for robot in self.gRobotList:
-                self.vrobot.sl = 0
-                self.vrobot.sr = 0
-                robot.set_wheel(0,self.vrobot.sl)
-                robot.set_wheel(1,self.vrobot.sr)
-                self.vrobot.t = time.time()
+            robot = self.robot
+            self.vrobot.sl = 0
+            self.vrobot.sr = 0
+            robot.set_wheel(0,self.vrobot.sl)
+            robot.set_wheel(1,self.vrobot.sr)
+            self.vrobot.t = time.time()
 
     def write_servo_position(self, robot, angle):
         robot.set_io_mode(1, 8)

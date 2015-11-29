@@ -142,20 +142,30 @@ class StateMachine:
 
   # set not it state
   def turnOff(self):
-    print "turning off"
     self.set_light(False)
     self.speed = 30
+    self.move_down()
+    time.sleep(1)
+    self.queue.queue.clear()
     self.move_up()
 
   # set it state
   def turnOn(self):
-    print "turning on"
     self.set_light(True)
     self.speed = 70
+    self.stop_move()
+    time.sleep(1)
+    self.queue.queue.clear()
     self.move_up()
 
+  def is_it(self):
+    return self.currentState[0:2] == "It"
+
   def delay_move_up(self):
-    time.sleep(1)
+    if (self.is_it()):
+        time.sleep(0.5)
+    else:
+        time.sleep(1)
     self.queue.queue.clear()
     self.move_up()
 
@@ -174,6 +184,10 @@ class StateMachine:
   def move_right(self):
     self.joystick.speed = self.speed
     self.joystick.move_right()
+
+  def stop_move(self):
+    self.joystick.speed = self.speed
+    self.joystick.stop_move()
 
   def run(self):
     self.move_up()
