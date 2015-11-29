@@ -108,8 +108,8 @@ class VirtualWorldGui:
 
     # reset to the starting position for the beginning of tag
     def resetvRobot(self, event=None):
-        coords = [(-100,-100), (-100,100), (100,100), (100,-100)]
-        angles = [0, 90, 180, 270]
+        coords = [(0, 0), (50, 0), (100,100), (100,-100)]
+        angles = [0, 0, 0, 270]
         self.joysticks = []
         for i, robot in enumerate(comm.robotList):
             joystick = self.create_joystick(robot)
@@ -190,7 +190,7 @@ class VirtualWorldGui:
             fsm = None
             if i == 0:
                 fsm = StateMachine(robot, self.joysticks[i])
-                fsm.queue.put("got tagged") # it 
+                fsm.queue.put("got tagged") # it
             else:
                 fsm = StateMachine(robot, self.joysticks[i])
                 fsm.queue.put("tagged") # not it
@@ -277,7 +277,7 @@ class VirtualWorldGui:
                 self.maintainItState()
 
             collide_index_1, ts1 =  collision_queue.get()
-            self.maintainItState()    
+            self.maintainItState()
             while(not collision_queue.empty()):
                 # two independent collisions are detected
                 collide_index_2, ts2 = collision_queue.get()
@@ -344,7 +344,7 @@ class VirtualWorldGui:
                 elem[1] = self._acc_y
             time.sleep(self._period)
 
-PROXIMITY_THRESHOLD = 30
+PROXIMITY_THRESHOLD = 55
 PROXIMITY_ERROR = 5
 def collectData(queue, robot):
     while not gQuit:
@@ -485,6 +485,48 @@ class Joystick:
                 time.sleep(0.1)
             self.stop_move()
 
+    def localize(self):
+        xs = []
+        ys = []
+        print "proximity left = ", self.vrobot.dist_l
+        print "proximity right = ", self.vrobot.dist_r
+        self.stop_move()
+        for _ in range(10):
+            xs.append(2)
+            ys.append(self.vrobot.dist_l)
+            xs.append(38)
+            ys.append(self.vrobot.dist_r)
+            time.sleep(0.02)
+        m, b = calculate_least_sqs(xs, ys)
+        perp_dist = sum(ys)/float(len(ys)) + 20 # 20 is half of the robot's length
+        angle = math.atan(m)
+        self.localize_helper(angle, perp_dist)
+        print "localize: angle = ", angle, " dist = ", perp_dist
+
+    def localize_helper(self, angle, perp_dist):
+        cur_angle = self.vrobot.a
+        theta_threshold = 0.25
+        if self.in_range(cur_angle, 3*math.pi/2, theta_threshold):
+            print "left wall"
+            self.vrobot.a = angle + 3*math.pi/2
+            self.vrobot.x = -180 + math.cos(angle)*perp_dist
+        elif self.in_range(cur_angle, math.pi, theta_threshold):
+            print "bottom wall"
+            self.vrobot.a = angle + math.pi
+            self.vrobot.y = -140 + math.cos(angle)*perp_dist
+        elif self.in_range(cur_angle, math.pi/2.0, theta_threshold):
+            print "right wall"
+            self.vrobot.a = angle + math.pi/2.0
+            self.vrobot.x = 180 - math.cos(angle)*perp_dist
+        elif self.in_range(cur_angle, 0, theta_threshold):
+            # top wall
+            print "top wall"
+            self.vrobot.a = angle
+            self.vrobot.y = 140 - math.cos(angle)*perp_dist
+
+    def in_range(self, a, b, threshold):
+        return a > (b - threshold) and a < (b + threshold)
+
     def play_sound(self):
         robot = self.robot
         robot.set_musical_note(40)
@@ -586,6 +628,13 @@ def main(argv=None):
 
     #create the virtual worlds that contains the virtual robot
     vWorld = virtual_world(drawQueue, rCanvas, canvas_width, canvas_height)
+
+    # top wall
+    vWorld.add_obstacle((-180, 180, 180, 140))
+    # right wall
+    vWorld.add_obstacle((180, 140, 220, -140))
+    vWorld.add_obstacle((-180, -140, 180, -180))
+    vWorld.add_obstacle((-220, 140, -180, -140))
 
     draw_world_thread = threading.Thread(target=draw_virtual_world, args=(vWorld,))
     draw_world_thread.daemon = True
