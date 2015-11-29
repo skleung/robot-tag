@@ -155,7 +155,7 @@ class StateMachine:
     self.move_up()
 
   def delay_move_up(self):
-    time.sleep(0.4)
+    # time.sleep(0.4)
     self.move_up()
 
   def move_up(self):
@@ -178,7 +178,7 @@ class StateMachine:
     self.move_up()
     while(True):
       state = self.states[self.currentState]
-      # print "qSize:", self.queue.qsize()
+      print "qSize:", self.queue.qsize()
       if self.queue.empty():
         time.sleep(0.05)
         continue

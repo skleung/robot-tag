@@ -272,18 +272,6 @@ class VirtualWorldGui:
                         self.fsms[it_index].queue.put("tagged")
                         self.fsms[not_it_index].queue.put("got tagged")
                         print "tag detected"
-                    else:
-                        print "something's wrong"
-
-                    # if self.fsms[collide_index_1].are_it or self.fsms[collide_index_2].are_it:
-                    #     print "tag detected"
-                    #     it_index = collide_index_1 if self.fsms[collide_index_1].are_it else collide_index_2
-                    #     not_it_index = collide_index_2 if self.fsms[collide_index_1].are_it else collide_index_1
-                    #     self.fsms[it_index].queue.put(("tagged", "Walk"))
-                    #     self.fsms[not_it_index].queue.put(("got tagged", "Walk"))
-                    #     self.joysticks[it_index].play_sound()
-                    #     collision_queue.queue.clear()
-                    #     break
 
     def lowpass(self, alpha, old, new):
         return alpha * new + (1.0 - alpha) * old
