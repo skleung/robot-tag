@@ -20,9 +20,6 @@ class StateMachine:
     self.joystick = joystick
     self.speed = 30
     self.queue = Queue.Queue()
-    # self.collisionQueue = Queue.Queue()
-
-    # add floor stuff later
 
     # ---- NOT IT ----
     # walk
@@ -30,7 +27,7 @@ class StateMachine:
     self.set_start("Walk")
 
     walk_state.add_transition("got tagged", self.turnOn, "It Walk") 
-    walk_state.add_transition("tagged", self.turnOn, "Walk") 
+    walk_state.add_transition("tagged", self.turnOff, "Walk") 
     walk_state.add_transition("obj right", self.move_left, "Walk Left")
     walk_state.add_transition("obj left", self.move_right, "Walk Right")
     walk_state.add_transition("obj ahead", self.move_right, "Walk Right")
@@ -42,49 +39,68 @@ class StateMachine:
     walk_edge_left_state.add_transition("floor left", self.move_right, "Walk Edge Left")
     walk_edge_left_state.add_transition("floor right", self.move_right, "Walk Edge Left")
     walk_edge_left_state.add_transition("floor clear", self.delay_move_up, "Walk")
+    walk_edge_left_state.add_transition("got tagged", self.turnOn, "It Walk") 
+    walk_edge_left_state.add_transition("tagged", self.turnOff, "Walk") 
     # walk edge right
     walk_edge_right_state = self.add_state("Walk Edge Right")
     walk_edge_right_state.add_transition("floor left", self.move_left, "Walk Edge Right")
     walk_edge_right_state.add_transition("floor right", self.move_left, "Walk Edge Right")
     walk_edge_right_state.add_transition("floor clear", self.delay_move_up, "Walk")
+    walk_edge_right_state.add_transition("got tagged", self.turnOn, "It Walk") 
+    walk_edge_right_state.add_transition("tagged", self.turnOff, "Walk") 
     # walk left
     walk_left_state = self.add_state("Walk Left")
     walk_left_state.add_transition("obj right", self.move_left, "Walk Left")
     walk_left_state.add_transition("obj left", self.move_right, "Walk Right")
     walk_left_state.add_transition("obj ahead", self.move_left, "Walk Left")
     walk_left_state.add_transition("clear", self.move_up, "Walk")
-    walk_state.add_transition("floor left", self.move_right, "Walk Edge Left")
-    walk_state.add_transition("floor right", self.move_left, "Walk Edge Right")
+    walk_left_state.add_transition("floor left", self.move_right, "Walk Edge Left")
+    walk_left_state.add_transition("floor right", self.move_left, "Walk Edge Right")
+    walk_left_state.add_transition("got tagged", self.turnOn, "It Walk") 
+    walk_left_state.add_transition("tagged", self.turnOff, "Walk") 
     # walk right
     walk_right_state = self.add_state("Walk Right")
     walk_right_state.add_transition("obj right", self.move_left, "Walk Left")
     walk_right_state.add_transition("obj left", self.move_right, "Walk Right")
     walk_right_state.add_transition("obj ahead", self.move_left, "Walk Right")
     walk_right_state.add_transition("clear", self.move_up, "Walk")
-    walk_state.add_transition("floor left", self.move_right, "Walk Edge Left")
-    walk_state.add_transition("floor right", self.move_left, "Walk Edge Right")
+    walk_right_state.add_transition("floor left", self.move_right, "Walk Edge Left")
+    walk_right_state.add_transition("floor right", self.move_left, "Walk Edge Right")
+    walk_right_state.add_transition("got tagged", self.turnOn, "It Walk") 
+    walk_right_state.add_transition("tagged", self.turnOff, "Walk") 
 
     # ---- IT ----
     # walk
     it_walk_state = self.add_state("It Walk")
     it_walk_state.add_transition("tagged", self.turnOff, "Walk") 
-    it_walk_state.add_transition("got tagged", self.turnOff, "It Walk") 
+    it_walk_state.add_transition("got tagged", self.turnOn, "It Walk") 
     it_walk_state.add_transition("obj right", self.move_right, "It Walk Right")
     it_walk_state.add_transition("obj left", self.move_left, "It Walk Left")
-    it_walk_state.add_transition("obj ahead", self.move_up, "It Walk") # could add ram state
+    it_walk_state.add_transition("obj ahead", self.move_up, "It Ram") 
     it_walk_state.add_transition("clear", self.move_up, "It Walk")
     it_walk_state.add_transition("floor left", self.move_right, "It Walk Edge Left")
     it_walk_state.add_transition("floor right", self.move_left, "It Walk Edge Right")
+    # it ram 
+    it_ram = self.add_state("It Ram")
+    it_ram.add_transition("clear", self.move_up, "It Walk")
+    it_ram.add_transition("tagged", self.turnOff, "Walk") 
+    it_ram.add_transition("got tagged", self.turnOn, "It Walk") 
+    it_ram.add_transition("floor left", self.move_right, "It Walk Edge Left")
+    it_ram.add_transition("floor right", self.move_left, "It Walk Edge Right")
     # walk edge left
     it_walk_edge_left_state = self.add_state("It Walk Edge Left")
     it_walk_edge_left_state.add_transition("floor left", self.move_right, "It Walk Edge Left")
     it_walk_edge_left_state.add_transition("floor right", self.move_right, "It Walk Edge Left")
     it_walk_edge_left_state.add_transition("floor clear", self.delay_move_up, "It Walk")
+    it_walk_edge_left_state.add_transition("tagged", self.turnOff, "Walk") 
+    it_walk_edge_left_state.add_transition("got tagged", self.turnOn, "It Walk") 
     # walk edge right
     it_walk_edge_right_state = self.add_state("It Walk Edge Right")
     it_walk_edge_right_state.add_transition("floor left", self.move_left, "It Walk Edge Right")
     it_walk_edge_right_state.add_transition("floor right", self.move_left, "It Walk Edge Right")
     it_walk_edge_right_state.add_transition("floor clear", self.delay_move_up, "It Walk")
+    it_walk_edge_right_state.add_transition("tagged", self.turnOff, "Walk") 
+    it_walk_edge_right_state.add_transition("got tagged", self.turnOn, "It Walk") 
     # walk left    
     it_walk_left_state = self.add_state("It Walk Left")
     it_walk_left_state.add_transition("obj right", self.move_right, "It Walk Right")
@@ -93,6 +109,8 @@ class StateMachine:
     it_walk_left_state.add_transition("clear", self.move_up, "It Walk")
     it_walk_left_state.add_transition("floor left", self.move_right, "It Walk Edge Left")
     it_walk_left_state.add_transition("floor right", self.move_left, "It Walk Edge Right")
+    it_walk_left_state.add_transition("tagged", self.turnOff, "Walk") 
+    it_walk_left_state.add_transition("got tagged", self.turnOn, "It Walk") 
     # walk right
     it_walk_right_state = self.add_state("It Walk Right")
     it_walk_right_state.add_transition("obj right", self.move_right, "It Walk Right")
@@ -101,7 +119,8 @@ class StateMachine:
     it_walk_right_state.add_transition("clear", self.move_up, "It Walk")
     it_walk_right_state.add_transition("floor left", self.move_right, "It Walk Edge Left")
     it_walk_right_state.add_transition("floor right", self.move_left, "It Walk Edge Right")
-
+    it_walk_right_state.add_transition("tagged", self.turnOff, "Walk") 
+    it_walk_right_state.add_transition("got tagged", self.turnOn, "It Walk") 
 
   def add_state(self, name):
     a_state = State()
@@ -132,7 +151,7 @@ class StateMachine:
   def turnOn(self):
     print "turning on"
     self.set_light(True)
-    self.speed = 60
+    self.speed = 70
     self.move_up()
 
   def delay_move_up(self):
@@ -159,7 +178,7 @@ class StateMachine:
     self.move_up()
     while(True):
       state = self.states[self.currentState]
-      print "qSize:", self.queue.qsize()
+      # print "qSize:", self.queue.qsize()
       if self.queue.empty():
         time.sleep(0.05)
         continue
@@ -168,6 +187,3 @@ class StateMachine:
         # print self.currentState, "-->", state.transitions[transitionName][1]
         state.transitions[transitionName][0]()
         self.currentState = state.transitions[transitionName][1]
-        # time.sleep(0.1)
-      else:
-        print "didn't register:", transitionName

@@ -33,7 +33,7 @@ from tk_hamster_GUI import *
 UPDATE_INTERVAL = 30
 
 comm = None
-gMaxRobotNum = 2 # max number of robots to control
+gMaxRobotNum = 3 # max number of robots to control
 # gRobotList = None
 gQuit = False
 m = None
@@ -190,8 +190,8 @@ class VirtualWorldGui:
             fsm = None
             if i == 0:
                 fsm = StateMachine(robot, self.joysticks[i])
-                # fsm.queue.put("got tagged") # it 
-                fsm.queue.put("tagged") # not it
+                fsm.queue.put("got tagged") # it 
+                # fsm.queue.put("tagged") # not it
             else:
                 fsm = StateMachine(robot, self.joysticks[i])
                 fsm.queue.put("tagged") # not it
