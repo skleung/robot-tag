@@ -190,8 +190,8 @@ class VirtualWorldGui:
             fsm = None
             if i == 0:
                 fsm = StateMachine(robot, self.joysticks[i])
-                fsm.queue.put("got tagged") # it 
-                # fsm.queue.put("tagged") # not it
+                # fsm.queue.put("got tagged") # it 
+                fsm.queue.put("tagged") # not it
             else:
                 fsm = StateMachine(robot, self.joysticks[i])
                 fsm.queue.put("tagged") # not it
@@ -266,15 +266,24 @@ class VirtualWorldGui:
                 # two independent collisions are detected
                 collide_index_2, ts2 = collision_queue.get()
                 if collide_index_1 != collide_index_2 and abs(ts2 - ts1) < 0.5:
-                    if self.fsms[collide_index_1].are_it or self.fsms[collide_index_2].are_it:
+                    if (self.fsms[collide_index_1].currentState[0:2] == "It" or self.fsms[collide_index_2].currentState[0:2] == "It"):
+                        it_index = collide_index_1 if self.fsms[collide_index_1].currentState[0:2] == "It" else collide_index_2
+                        not_it_index = collide_index_2 if self.fsms[collide_index_1].currentState[0:2] == "It" else collide_index_1
+                        self.fsms[it_index].queue.put("tagged")
+                        self.fsms[not_it_index].queue.put("got tagged")
                         print "tag detected"
-                        it_index = collide_index_1 if self.fsms[collide_index_1].are_it else collide_index_2
-                        not_it_index = collide_index_2 if self.fsms[collide_index_1].are_it else collide_index_1
-                        self.fsms[it_index].queue.put(("tagged", "Walk"))
-                        self.fsms[not_it_index].queue.put(("got tagged", "Walk"))
-                        self.joysticks[it_index].play_sound()
-                        collision_queue.queue.clear()
-                        break
+                    else:
+                        print "something's wrong"
+
+                    # if self.fsms[collide_index_1].are_it or self.fsms[collide_index_2].are_it:
+                    #     print "tag detected"
+                    #     it_index = collide_index_1 if self.fsms[collide_index_1].are_it else collide_index_2
+                    #     not_it_index = collide_index_2 if self.fsms[collide_index_1].are_it else collide_index_1
+                    #     self.fsms[it_index].queue.put(("tagged", "Walk"))
+                    #     self.fsms[not_it_index].queue.put(("got tagged", "Walk"))
+                    #     self.joysticks[it_index].play_sound()
+                    #     collision_queue.queue.clear()
+                    #     break
 
     def lowpass(self, alpha, old, new):
         return alpha * new + (1.0 - alpha) * old
@@ -349,6 +358,15 @@ def collectData(queue, robot):
         else:
             queue.put("clear")
 
+        # print "floor:", floor_left, floor_right
+        if (floor_left < 30):
+            queue.put("floor left")
+        elif (floor_right < 30):
+            queue.put("floor right")
+        else:
+            queue.put("floor clear")
+
+
         # if (floor_left < 25 and floor_right > 25):
         #     queue.put(("line left", "Walk"))
         # if (floor_left > 25 and floor_right < 25):
@@ -368,7 +386,7 @@ def collectData(queue, robot):
         #         queue.put(("robot left", "Walk"))
         #     else: # go straight
         #         queue.put(("robot ahead", "Walk"))
-        time.sleep(0.1)
+        time.sleep(0.05)
 
 def calculate_least_sqs(xvalues, yvalues):
     x = np.array(xvalues)
@@ -399,7 +417,7 @@ class Joystick:
     def move_up(self, event=None):
         if self.gRobotList:
             robot = self.robot
-            print "moving up with robot = ", robot
+            # print "moving up with robot = ", robot
             self.vrobot.sl = self.speed
             self.vrobot.sr = self.speed
             robot.set_wheel(0,self.vrobot.sl)
